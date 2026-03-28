@@ -1,0 +1,10 @@
+sounddevice
+numpy
+scipy
+openwakeword
+onnxruntime
+anthropic
+elevenlabs
+duckduckgo-search
+Pillow
+python-dotenv

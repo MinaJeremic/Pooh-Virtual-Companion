@@ -1,0 +1,13 @@
+{
+    "claude_model": "claude-sonnet-4-6",
+    "anthropic_api_key": "YOUR_ANTHROPIC_API_KEY",
+    "vision_model": "moondream",
+    "elevenlabs_api_key": "",
+    "elevenlabs_voice_id": "6fZce9LFNG3iEITDfqZZ",
+    "chat_memory": true,
+    "camera_rotation": 180,
+    "system_prompt_extras": "",
+    "use_piper_tts": true,
+    "piper_model": "./piper/en_GB-semaine-medium.onnx",
+    "proactive_checkin_minutes": 30
+}
