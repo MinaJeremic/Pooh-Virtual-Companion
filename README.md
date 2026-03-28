@@ -1,1 +1,1 @@
-# Pollo-Personal-Assistant-Bot
+# Pooh-Virtual-Companion
