@@ -21,22 +21,14 @@ piper/
 # !wakeword.onnx
 
 # --- User Configuration & Memory ---
-# Keep chat history local (Privacy)
-memory.json
-chat_memory.json
 
 # Keep personal API keys or settings local
 # (Optional: comment this out if you WANT to share your config)
 # config.json
 
-# --- Temporary/Generated Media ---
-*.wav
-*.mp3
-*.jpg
-*.png
+# --- Temporary Captures ---
 camera_capture.jpg
 current_image.jpg
-test_audio.wav
 
 # --- Legacy single-file version (kept local only) ---
 agent.py
