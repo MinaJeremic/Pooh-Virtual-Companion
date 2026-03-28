@@ -2,7 +2,10 @@ import datetime
 import subprocess
 
 from PIL import Image
-from ddgs import DDGS
+try:
+    from duckduckgo_search import DDGS
+except ImportError:
+    DDGS = None
 
 from config import CURRENT_CONFIG, IMAGE_FILE
 

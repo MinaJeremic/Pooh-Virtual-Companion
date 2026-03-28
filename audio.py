@@ -1,53 +1,10 @@
-import os
 import wave
-import random
 import time
 
 import numpy as np
-import scipy.signal
 import sounddevice as sd
 
-from config import INPUT_DEVICE_NAME, SOUND_DIRS
-
-
-# ── Playback ──────────────────────────────────────────────────────────────────
-
-def get_random_sound(category):
-    """Return a random .wav path from a sound category folder, or None."""
-    directory = SOUND_DIRS.get(category, "")
-    if os.path.exists(directory):
-        files = [f for f in os.listdir(directory) if f.endswith(".wav")]
-        return os.path.join(directory, random.choice(files)) if files else None
-    return None
-
-
-def play_sound(file_path):
-    """Play a .wav file, resampling if needed for the output device."""
-    if not file_path or not os.path.exists(file_path):
-        return
-    try:
-        with wave.open(file_path, "rb") as wf:
-            file_sr = wf.getframerate()
-            data = wf.readframes(wf.getnframes())
-            audio = np.frombuffer(data, dtype=np.int16)
-
-        try:
-            native_rate = int(sd.query_devices(kind="output")["default_samplerate"])
-        except:
-            native_rate = 48000
-
-        playback_rate = file_sr
-        try:
-            sd.check_output_settings(device=None, samplerate=file_sr)
-        except:
-            playback_rate = native_rate
-            num_samples = int(len(audio) * (native_rate / file_sr))
-            audio = scipy.signal.resample(audio, num_samples).astype(np.int16)
-
-        sd.play(audio, playback_rate)
-        sd.wait()
-    except:
-        pass
+from config import INPUT_DEVICE_NAME
 
 
 # ── Recording ─────────────────────────────────────────────────────────────────
@@ -64,7 +21,6 @@ def save_audio_buffer(buffer, filename, samplerate=16000):
         wf.setsampwidth(2)
         wf.setframerate(samplerate)
         wf.writeframes(audio_data.tobytes())
-    play_sound(get_random_sound("ack"))
     return filename
 
 

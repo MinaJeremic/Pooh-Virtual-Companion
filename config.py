@@ -17,13 +17,6 @@ WAKE_WORD_MODEL = "./wakeword.onnx"
 WAKE_WORD_THRESHOLD = 0.5
 INPUT_DEVICE_NAME = None
 
-SOUND_DIRS = {
-    "greeting": "sounds/greeting_sounds",
-    "ack":      "sounds/ack_sounds",
-    "thinking": "sounds/thinking_sounds",
-    "error":    "sounds/error_sounds",
-}
-
 DEFAULT_CONFIG = {
     "claude_model": "claude-sonnet-4-6",
     "anthropic_api_key": "",

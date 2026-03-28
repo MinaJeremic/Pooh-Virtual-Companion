@@ -8,7 +8,6 @@ import numpy as np
 import sounddevice as sd
 
 from config import CURRENT_CONFIG, EL_CLIENT
-from audio import get_random_sound, play_sound
 
 
 class TTSEngine:
@@ -68,11 +67,12 @@ class TTSEngine:
         self._thinking.clear()
 
     def _thinking_sound_loop(self):
-        time.sleep(0.5)
+        time.sleep(2.0)
+        phrases = ["Think, think, think...", "Hmm, let me think...", "Oh, just a moment..."]
+        idx = 0
         while self._thinking.is_set():
-            sound = get_random_sound("thinking")
-            if sound:
-                play_sound(sound)
+            self.speak(phrases[idx % len(phrases)])
+            idx += 1
             for _ in range(50):
                 if not self._thinking.is_set():
                     return
@@ -112,7 +112,7 @@ class TTSEngine:
         print(f"[ELEVENLABS] '{clean}'", flush=True)
         voice_id = CURRENT_CONFIG.get("elevenlabs_voice_id", "Rachel")
         try:
-            audio_stream = EL_CLIENT.text_to_speech.convert_as_stream(
+            audio_stream = EL_CLIENT.text_to_speech.stream(
                 voice_id=voice_id,
                 text=clean,
                 model_id="eleven_turbo_v2_5",

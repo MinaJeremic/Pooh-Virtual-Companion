@@ -10,7 +10,7 @@ from PIL import Image, ImageTk
 
 from config import BotStates, CURRENT_CONFIG
 from memory import load_chat_history, save_chat_history
-from audio import play_sound, get_random_sound, record_voice_adaptive, record_voice_ptt
+from audio import record_voice_adaptive, record_voice_ptt
 from wakeword import WakeWordDetector
 from voice import TTSEngine
 from brain import Brain
@@ -257,7 +257,7 @@ class BotGUI:
         self.set_state(BotStates.WARMUP, "Warming up brains...")
         from config import CLAUDE_MODEL
         print(f"Using Claude model: {CLAUDE_MODEL}", flush=True)
-        play_sound(get_random_sound("greeting"))
+        self.tts.enqueue("Hello there, friend.")
         print("Ready.", flush=True)
 
     def _transcribe(self, filename):
