@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"name": "Pollo-Personal-Assistant-Bot",
+			"path": "."
+		},
+		{
+			"name": "faces",
+			"path": "../../Downloads/faces"
+		}
+	],
+	"settings": {}
+}
