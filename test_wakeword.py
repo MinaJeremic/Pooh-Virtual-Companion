@@ -149,6 +149,14 @@ class WakeWordTestApp:
         self.label = tk.Label(master, bg="black")
         self.label.place(x=0, y=0, width=BG_WIDTH, height=BG_HEIGHT)
 
+        # Volume bar
+        self.vol_canvas = tk.Canvas(master, height=20, bg="#111111", highlightthickness=0)
+        self.vol_canvas.place(relx=0.05, rely=0.88, relwidth=0.9, anchor=tk.W)
+        self.vol_bar = self.vol_canvas.create_rectangle(0, 0, 0, 20, fill="#00ff00")
+        self.vol_label = tk.Label(master, text="VOL: 0.0000", font=("Arial", 10),
+                                  fg="#aaaaaa", bg="black")
+        self.vol_label.place(relx=0.5, rely=0.85, anchor=tk.S)
+
         self.info = tk.Label(master, text="", font=("Arial", 20), fg="white", bg="black")
         self.info.place(relx=0.5, rely=0.95, anchor=tk.S)
 
@@ -170,6 +178,21 @@ class WakeWordTestApp:
 
     def set_info(self, text):
         self.master.after(0, lambda: self.info.config(text=text))
+
+    def update_volume(self, peak):
+        def _update():
+            bar_width = int(min(peak * 500, 1.0) * self.vol_canvas.winfo_width())
+            # Color: green → yellow → red
+            if peak < 0.05:
+                color = "#00ff00"
+            elif peak < 0.2:
+                color = "#ffff00"
+            else:
+                color = "#ff0000"
+            self.vol_canvas.coords(self.vol_bar, 0, 0, bar_width, 20)
+            self.vol_canvas.itemconfig(self.vol_bar, fill=color)
+            self.vol_label.config(text=f"VOL: {peak:.4f}")
+        self.master.after(0, _update)
 
     def animate(self):
         import random
@@ -195,8 +218,11 @@ class WakeWordTestApp:
             audio = record_chunk(LISTEN_CHUNK, self.samplerate)
             peak = np.max(np.abs(audio))
 
-            # Skip if too quiet (no one talking)
+            # Update volume bar
+            self.update_volume(peak)
             print(f"[VOL] peak={peak:.4f}", flush=True)
+
+            # Skip if too quiet (no one talking)
             if peak < 0.001:
                 continue
 
