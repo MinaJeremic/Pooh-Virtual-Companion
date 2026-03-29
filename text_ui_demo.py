@@ -341,7 +341,7 @@ class TextFaceDemo:
                 if not self.running:
                     return
                 print(ch, end="", flush=True)
-                time.sleep(0.018)
+                time.sleep(0.04)
             print("\n", flush=True)
 
             # Back to awake listening
