@@ -1,6 +1,8 @@
 import os
 import queue
 import random
+import select
+import sys
 import threading
 import time
 import tkinter as tk
@@ -70,6 +72,7 @@ def run_terminal_only_demo():
 
 class TextFaceDemo:
     BG_WIDTH, BG_HEIGHT = 800, 480
+    SESSION_TIMEOUT_SECONDS = 5 * 60
 
     # Face animation speeds (ms per frame)
     SPEED_SPEAKING = 80
@@ -81,6 +84,8 @@ class TextFaceDemo:
         self.state     = "warmup"
         self.frame_idx = 0
         self.messages  = []
+        self.awake = False
+        self.last_input_at = 0.0
 
         # Thread -> main-thread command queue.
         # This is the ONLY correct way to drive Tkinter from a bg thread.
@@ -121,7 +126,7 @@ class TextFaceDemo:
         self._apply_state("warmup")
         self._apply_caption("Hello there, friend!")
         master.after(1600, lambda: self._apply_state("idle"))
-        master.after(1700, lambda: self._apply_caption("Type in your SSH terminal..."))
+        master.after(1700, lambda: self._apply_caption("Wake me up"))
 
         print("-" * 50, flush=True)
         print("  POOH DEMO  |  type here, face changes on screen", flush=True)
@@ -206,20 +211,83 @@ class TextFaceDemo:
         speed = self.SPEED_SPEAKING if self.state == "speaking" else self.SPEED_OTHER
         self.master.after(speed, self._animate)
 
+    def _read_user_text(self, timeout_seconds=None, awake_mode=False):
+        """
+        Read one line from stdin while keeping lively waiting states.
+        Returns: str | None | "__TIMEOUT__"
+        """
+        start = time.monotonic()
+        tick = 0
+
+        while self.running:
+            # inactivity timeout
+            if timeout_seconds is not None and (time.monotonic() - start) >= timeout_seconds:
+                return "__TIMEOUT__"
+
+            # playful idle behavior while waiting
+            tick += 1
+            if awake_mode and tick % 6 == 0:
+                self.set_state("listening")
+                self.set_caption("I'm awake. Talk to me.")
+            elif tick % 6 == 3:
+                self.set_state("idle")
+                self.set_caption("Wake me up" if not awake_mode else "I'm awake. Talk to me.")
+
+            try:
+                ready, _, _ = select.select([sys.stdin], [], [], 0.5)
+            except Exception:
+                # Fallback for environments where select(stdin) is unavailable.
+                try:
+                    line = input()
+                except (EOFError, KeyboardInterrupt):
+                    return None
+                return (line or "").strip()
+
+            if ready:
+                line = sys.stdin.readline()
+                if line == "":
+                    return None
+                return line.strip()
+
+        return None
+
     # ── Background input / AI loop ────────────────────────────────────
 
     def _input_loop(self):
+        awake_deadline = 0.0
+
         while self.running:
-            # ── Idle: wait for the user to type ──────────────────────
-            self.set_state("idle")
-            self.set_caption("Type in your SSH terminal...")
+            now = time.monotonic()
+
+            # sleep if awake window expired
+            if self.awake and now >= awake_deadline:
+                self.awake = False
+                self.set_state("idle")
+                self.set_caption("Wake me up")
+                print("\n[FACE -> IDLE] session timeout (5 min)", flush=True)
+
+            # waiting prompt
+            if self.awake:
+                self.set_state("listening")
+                self.set_caption("I'm awake. Talk to me.")
+            else:
+                self.set_state("idle")
+                self.set_caption("Wake me up")
+
             print("\nYou: ", end="", flush=True)
 
-            try:
-                user_text = input().strip()
-            except (EOFError, KeyboardInterrupt):
+            remaining = None
+            if self.awake:
+                remaining = max(0.1, awake_deadline - time.monotonic())
+
+            user_text = self._read_user_text(timeout_seconds=remaining, awake_mode=self.awake)
+            if user_text is None:
                 self.shutdown()
                 return
+
+            if user_text == "__TIMEOUT__":
+                # loop back; expiration is handled at top of loop
+                continue
 
             if not user_text:
                 continue
@@ -229,6 +297,13 @@ class TextFaceDemo:
                 time.sleep(1.0)
                 self.shutdown()
                 return
+
+            # wake session and reset inactivity deadline
+            if not self.awake:
+                print("[FACE -> AWAKE]", flush=True)
+            self.awake = True
+            self.last_input_at = time.monotonic()
+            awake_deadline = self.last_input_at + self.SESSION_TIMEOUT_SECONDS
 
             # ── Listening ────────────────────────────────────────────
             print("[FACE -> LISTENING]", flush=True)
@@ -266,7 +341,9 @@ class TextFaceDemo:
 
             # Brief pause on speaking face before looping back to idle
             time.sleep(0.6)
-            print("[FACE -> IDLE]", flush=True)
+            self.set_state("listening")
+            self.set_caption("I'm awake. Talk to me.")
+            print("[FACE -> LISTENING] (awake)", flush=True)
 
     # ── Shutdown ──────────────────────────────────────────────────────
 
