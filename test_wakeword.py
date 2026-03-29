@@ -13,12 +13,12 @@ from PIL import Image, ImageTk
 
 
 # ── Settings ────────────────────────────────────────────────────────────────
-WAKE_PHRASE = "hey pooh"
+WAKE_PHRASES = ["hey pooh", "hey poo", "hey puh", "a]pooh", "hey po", "hey boo", "hey poooh"]
 BG_WIDTH, BG_HEIGHT = 800, 480
 WHISPER_CLI = "./whisper.cpp/build/bin/whisper-cli"
 WHISPER_MODEL = "./whisper.cpp/models/ggml-base.en.bin"
-LISTEN_CHUNK = 2  # seconds per chunk to check for wake word
-SILENCE_THRESHOLD = 0.008
+LISTEN_CHUNK = 3  # seconds per chunk to check for wake word
+SILENCE_THRESHOLD = 0.003
 RECORD_SILENCE_SECS = 1.5
 RECORD_MAX_SECS = 15
 
@@ -193,7 +193,8 @@ class WakeWordTestApp:
             peak = np.max(np.abs(audio))
 
             # Skip if too quiet (no one talking)
-            if peak < 0.01:
+            print(f"[VOL] peak={peak:.4f}", flush=True)
+            if peak < 0.005:
                 continue
 
             # Save and transcribe the chunk
@@ -203,7 +204,7 @@ class WakeWordTestApp:
             print(f"[HEARD] '{text_lower}'", flush=True)
 
             # Check for wake phrase
-            if WAKE_PHRASE in text_lower:
+            if any(phrase in text_lower for phrase in WAKE_PHRASES):
                 print("[WAKE] Hey Pooh detected!", flush=True)
                 self.handle_conversation()
 
