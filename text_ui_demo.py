@@ -126,11 +126,11 @@ class TextFaceDemo:
         self._poll_queue()   # drains _q every 40 ms
         self._animate()      # cycles face frames
 
-        # Warmup greeting then settle to idle
+        # Startup: play warmup animation then go to sleeping idle
         self._apply_state("warmup")
         self._apply_caption("Hello there, friend!")
-        master.after(1600, lambda: self._apply_state("idle"))
-        master.after(1700, lambda: self._apply_caption("Wake me up"))
+        master.after(1800, lambda: self._apply_state("idle"))
+        master.after(1900, lambda: self._apply_caption("Wake me up"))
 
         print("-" * 50, flush=True)
         print("  POOH DEMO  |  type here, face changes on screen", flush=True)
@@ -197,6 +197,9 @@ class TextFaceDemo:
                     self._apply_state(value)
                 elif cmd == "caption":
                     self._apply_caption(value)
+                elif cmd == "reset_blink":
+                    self._next_blink_at = time.monotonic() + self.BLINK_INTERVAL_SECONDS
+                    self._blink_until = 0.0
         except queue.Empty:
             pass
         if self.running:
@@ -207,71 +210,49 @@ class TextFaceDemo:
         if not self.running:
             return
 
-        # Keep eyes open while waiting by borrowing listening frames for idle.
-        if self.state == "idle" and len(self.faces.get("listening", [])) > 0:
-            frames = self.faces["listening"]
-        else:
-            frames = self.faces.get(self.state, self.faces["idle"])
+        frames = self.faces.get(self.state, self.faces["idle"])
 
-        # Waiting states: mostly eyes-open, blink every 45 seconds.
-        if self.state in {"idle", "listening"} and len(frames) > 1:
+        if self.state == "listening" and len(frames) > 1:
+            # Awake and eyes open: blink every 45 s
             now = time.monotonic()
             if now >= self._next_blink_at:
                 self._blink_until = now + self.BLINK_DURATION_SECONDS
                 self._next_blink_at = now + self.BLINK_INTERVAL_SECONDS
-
-            if now < self._blink_until:
-                self.frame_idx = 1  # blink frame
-            else:
-                self.frame_idx = 0  # eyes open frame
+            self.frame_idx = 1 if now < self._blink_until else 0
 
         elif self.state == "speaking" and len(frames) > 1:
             self.frame_idx = random.randint(0, len(frames) - 1)
+
         else:
+            # idle (sleeping), thinking, warmup, error: cycle normally
             self.frame_idx = (self.frame_idx + 1) % len(frames)
 
         self.bg_label.config(image=frames[self.frame_idx])
         speed = self.SPEED_SPEAKING if self.state == "speaking" else self.SPEED_OTHER
         self.master.after(speed, self._animate)
 
-    def _read_user_text(self, timeout_seconds=None, awake_mode=False):
+    def _read_user_text(self, timeout_seconds=None):
         """
-        Read one line from stdin while keeping lively waiting states.
-        Returns: str | None | "__TIMEOUT__"
+        Non-blocking stdin read with optional timeout.
+        Returns: str (input) | None (EOF/interrupt) | "__TIMEOUT__" (timed out)
         """
         start = time.monotonic()
-        tick = 0
-
         while self.running:
-            # inactivity timeout
             if timeout_seconds is not None and (time.monotonic() - start) >= timeout_seconds:
                 return "__TIMEOUT__"
-
-            # playful idle behavior while waiting
-            tick += 1
-            if awake_mode and tick % 6 == 0:
-                self.set_state("listening")
-                self.set_caption("I'm awake. Talk to me.")
-            elif tick % 6 == 3:
-                self.set_state("listening")
-                self.set_caption("Wake me up" if not awake_mode else "I'm awake. Talk to me.")
-
             try:
                 ready, _, _ = select.select([sys.stdin], [], [], 0.5)
             except Exception:
-                # Fallback for environments where select(stdin) is unavailable.
                 try:
                     line = input()
                 except (EOFError, KeyboardInterrupt):
                     return None
                 return (line or "").strip()
-
             if ready:
                 line = sys.stdin.readline()
                 if line == "":
                     return None
                 return line.strip()
-
         return None
 
     # ── Background input / AI loop ────────────────────────────────────
@@ -282,36 +263,31 @@ class TextFaceDemo:
         while self.running:
             now = time.monotonic()
 
-            # sleep if awake window expired
+            # ── 5-minute inactivity timeout: go back to sleep ─────────
             if self.awake and now >= awake_deadline:
                 self.awake = False
-                self.set_state("listening")
+                self.set_state("idle")
                 self.set_caption("Wake me up")
-                print("\n[FACE -> IDLE] session timeout (5 min)", flush=True)
+                print("\n[FACE -> IDLE] session timeout, going to sleep", flush=True)
 
-            # waiting prompt
+            # ── Set waiting face ──────────────────────────────────────
             if self.awake:
                 self.set_state("listening")
                 self.set_caption("I'm awake. Talk to me.")
             else:
-                self.set_state("listening")
+                self.set_state("idle")   # sleeping face
                 self.set_caption("Wake me up")
 
             print("\nYou: ", end="", flush=True)
 
-            remaining = None
-            if self.awake:
-                remaining = max(0.1, awake_deadline - time.monotonic())
+            remaining = max(0.1, awake_deadline - time.monotonic()) if self.awake else None
+            user_text = self._read_user_text(timeout_seconds=remaining)
 
-            user_text = self._read_user_text(timeout_seconds=remaining, awake_mode=self.awake)
             if user_text is None:
                 self.shutdown()
                 return
-
             if user_text == "__TIMEOUT__":
-                # loop back; expiration is handled at top of loop
-                continue
-
+                continue   # expiration handled at top of loop
             if not user_text:
                 continue
             if user_text.lower() in {"quit", "exit", "bye"}:
@@ -321,9 +297,15 @@ class TextFaceDemo:
                 self.shutdown()
                 return
 
-            # wake session and reset inactivity deadline
+            # ── Wake up: play warmup animation on first input ─────────
             if not self.awake:
-                print("[FACE -> AWAKE]", flush=True)
+                print("[FACE -> WARMUP] waking up!", flush=True)
+                self.set_state("warmup")
+                self.set_caption("Oh! Hello there!")
+                time.sleep(1.8)   # warmup animation plays
+                # Reset blink clock so first blink is 45s from now
+                self._q.put(("reset_blink", None))
+
             self.awake = True
             self.last_input_at = time.monotonic()
             awake_deadline = self.last_input_at + self.SESSION_TIMEOUT_SECONDS
@@ -332,7 +314,7 @@ class TextFaceDemo:
             print("[FACE -> LISTENING]", flush=True)
             self.set_state("listening")
             self.set_caption("Listening...")
-            time.sleep(0.5)   # hold listening face so it's visible
+            time.sleep(0.4)
 
             # ── Thinking ─────────────────────────────────────────────
             print("[FACE -> THINKING]", flush=True)
@@ -362,8 +344,8 @@ class TextFaceDemo:
                 time.sleep(0.018)
             print("\n", flush=True)
 
-            # Brief pause on speaking face before looping back to idle
-            time.sleep(0.6)
+            # Back to awake listening
+            time.sleep(0.5)
             self.set_state("listening")
             self.set_caption("I'm awake. Talk to me.")
             print("[FACE -> LISTENING] (awake)", flush=True)
