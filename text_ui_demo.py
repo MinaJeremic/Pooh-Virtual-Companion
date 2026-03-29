@@ -286,7 +286,7 @@ class TextFaceDemo:
             # ── Set waiting face ──────────────────────────────────────
             if self.awake:
                 self.set_state("listening")
-                self.set_caption("I'm awake. Talk to me.")
+                self.set_caption("")
             else:
                 self.set_state("idle")   # sleeping face
                 self.set_caption("Wake me up")
@@ -370,7 +370,7 @@ class TextFaceDemo:
             # Back to awake listening
             time.sleep(0.5)
             self.set_state("listening")
-            self.set_caption("I'm awake. Talk to me.")
+            self.set_caption("")
             print("[FACE -> LISTENING] (awake)", flush=True)
 
     # ── Shutdown ──────────────────────────────────────────────────────
