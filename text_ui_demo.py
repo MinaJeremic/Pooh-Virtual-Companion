@@ -7,6 +7,58 @@ from PIL import Image, ImageTk
 from config import AI_CLIENT, CLAUDE_MODEL, SYSTEM_PROMPT
 
 
+def ask_claude(messages, user_text):
+    msgs = messages + [{"role": "user", "content": user_text}]
+    response = AI_CLIENT.messages.create(
+        model=CLAUDE_MODEL,
+        system=SYSTEM_PROMPT,
+        messages=msgs,
+        max_tokens=300,
+    )
+    text = response.content[0].text.strip()
+    messages.append({"role": "user", "content": user_text})
+    messages.append({"role": "assistant", "content": text})
+    return text
+
+
+def run_terminal_only_demo():
+    messages = []
+    print("--- TERMINAL-ONLY POOH DEMO (no GUI display found) ---", flush=True)
+    print("Type in terminal. Press Ctrl+C or type 'quit' to exit.\n", flush=True)
+    print("Hello there, friend.", flush=True)
+
+    while True:
+        try:
+            user_text = input("\nYou: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nBye for now.", flush=True)
+            return
+
+        if not user_text:
+            continue
+        if user_text.lower() in {"quit", "exit"}:
+            print("Bye for now.", flush=True)
+            return
+
+        print("[STATE] LISTENING", flush=True)
+        time.sleep(0.25)
+        print("[STATE] THINKING", flush=True)
+
+        try:
+            answer = ask_claude(messages, user_text)
+        except Exception as e:
+            print(f"[ERROR] Claude error: {e}", flush=True)
+            continue
+
+        print("[STATE] SPEAKING", flush=True)
+        print("[Pooh] ", end="", flush=True)
+        for ch in answer:
+            print(ch, end="", flush=True)
+            time.sleep(0.018)
+        print("", flush=True)
+        print("[STATE] IDLE", flush=True)
+
+
 class TextFaceDemo:
     BG_WIDTH, BG_HEIGHT = 800, 480
 
@@ -97,17 +149,7 @@ class TextFaceDemo:
         self.master.after(speed, self._animate)
 
     def _ask_claude(self, user_text):
-        msgs = self.messages + [{"role": "user", "content": user_text}]
-        response = AI_CLIENT.messages.create(
-            model=CLAUDE_MODEL,
-            system=SYSTEM_PROMPT,
-            messages=msgs,
-            max_tokens=300,
-        )
-        text = response.content[0].text.strip()
-        self.messages.append({"role": "user", "content": user_text})
-        self.messages.append({"role": "assistant", "content": text})
-        return text
+        return ask_claude(self.messages, user_text)
 
     def _type_print(self, text, delay=0.018):
         self.set_state("speaking")
@@ -168,7 +210,12 @@ class TextFaceDemo:
 
 
 def main():
-    root = tk.Tk()
+    try:
+        root = tk.Tk()
+    except tk.TclError:
+        run_terminal_only_demo()
+        return
+
     TextFaceDemo(root)
     root.mainloop()
 
