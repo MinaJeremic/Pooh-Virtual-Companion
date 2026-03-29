@@ -14,6 +14,8 @@ Run the setup script:
 
 That installs Python packages, builds `whisper.cpp`, and downloads the English base Whisper model.
 
+It does not auto-download the default `Hey Jarvis` ONNX model, so `Hey Pooh` uses the Whisper fallback by default.
+
 ## Run
 
 Start the assistant with:

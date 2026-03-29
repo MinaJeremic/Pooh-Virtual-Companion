@@ -31,10 +31,11 @@ source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Download wake word model if missing
-if [ ! -f "wakeword.onnx" ]; then
-    echo -e "${YELLOW}Downloading default 'Hey Jarvis' wake word...${NC}"
-    curl -L -o wakeword.onnx https://github.com/dscripka/openWakeWord/raw/main/openwakeword/resources/models/hey_jarvis_v0.1.onnx
+# Optional ONNX wake-word model
+if [ -f "wakeword.onnx" ]; then
+    echo -e "${GREEN}Found custom wakeword.onnx — the app can use it if desired.${NC}"
+else
+    echo -e "${YELLOW}No wakeword.onnx found. The app will use whisper.cpp for 'Hey Pooh'.${NC}"
 fi
 
 # Install whisper.cpp for transcription and 'Hey Pooh' wake fallback
