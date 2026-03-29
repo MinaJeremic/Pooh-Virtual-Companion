@@ -78,6 +78,17 @@ class BotGUI:
                                       background="#2e2e2e", foreground="white")
         self.exit_button  = ttk.Button(master, text="Exit & Save", command=self.safe_exit)
 
+        # ── Caption overlay (always visible) ─────────────────────────────────
+        self.caption_var = tk.StringVar(value="")
+        self.caption_label = tk.Label(
+            master, textvariable=self.caption_var,
+            bg="#000000", fg="#ffffff", font=("Arial", 18, "bold"),
+            wraplength=750, justify=tk.CENTER, padx=10, pady=6,
+        )
+        self.caption_label.place(relx=0.5, rely=0.92, anchor=tk.CENTER)
+        self.caption_label.lift()
+        self._caption_clear_id = None
+
         self.load_animations()
         self.update_animation()
 
@@ -176,6 +187,35 @@ class BotGUI:
             self.response_text.see(tk.END)
             self.response_text.config(state=tk.DISABLED)
         self.master.after(0, _update)
+        # Also stream bot response to caption
+        self._append_caption(chunk)
+
+    def set_caption(self, text, timeout=8000):
+        """Show caption text on screen. Auto-clears after timeout ms."""
+        def _update():
+            if self._caption_clear_id is not None:
+                self.master.after_cancel(self._caption_clear_id)
+            self.caption_var.set(text)
+            self.caption_label.lift()
+            if timeout:
+                self._caption_clear_id = self.master.after(timeout, self._clear_caption)
+        self.master.after(0, _update)
+
+    def _append_caption(self, chunk):
+        """Append streamed text to the caption (for bot responses)."""
+        def _update():
+            current = self.caption_var.get()
+            # Limit caption length to last ~120 chars for readability
+            combined = current + chunk
+            if len(combined) > 120:
+                combined = "..." + combined[-117:]
+            self.caption_var.set(combined)
+            self.caption_label.lift()
+        self.master.after(0, _update)
+
+    def _clear_caption(self):
+        self.caption_var.set("")
+        self._caption_clear_id = None
 
     # ── Animation ─────────────────────────────────────────────────────────────
 
@@ -229,6 +269,7 @@ class BotGUI:
                     continue
 
                 self.set_state(BotStates.LISTENING, "I'm listening!")
+                self.set_caption("Listening...", timeout=0)
 
                 if trigger == "PTT":
                     audio_file = record_voice_ptt(self.recording_active)
@@ -237,15 +278,24 @@ class BotGUI:
 
                 if not audio_file:
                     self.set_state(BotStates.IDLE, "Heard nothing.")
+                    self.set_caption("")
                     continue
 
+                self.set_caption("Transcribing...", timeout=0)
                 user_text = self._transcribe(audio_file)
                 if not user_text:
                     self.set_state(BotStates.IDLE, "Transcription empty.")
+                    self.set_caption("")
                     continue
 
+                # Show what the bot heard
+                self.set_caption(f'You: "{user_text}"', timeout=0)
                 self.append_to_text(f"YOU: {user_text}")
                 self.interrupted.clear()
+
+                # Clear caption before bot response streams in
+                time.sleep(2)
+                self.set_caption("", timeout=0)
                 self.brain.chat_and_respond(user_text)
 
         except Exception as e:

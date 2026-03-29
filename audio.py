@@ -5,6 +5,7 @@ import numpy as np
 import sounddevice as sd
 
 from config import INPUT_DEVICE_NAME
+from audio_processing import preprocess_chunk, preprocess_buffer
 
 
 # ── Recording ─────────────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ def save_audio_buffer(buffer, filename, samplerate=16000):
         return None
     audio_data = np.concatenate(buffer, axis=0).flatten()
     audio_data = np.nan_to_num(audio_data, nan=0.0, posinf=0.0, neginf=0.0)
+    audio_data = preprocess_buffer(audio_data, samplerate)
     audio_data = (audio_data * 32767).astype(np.int16)
     with wave.open(filename, "wb") as wf:
         wf.setnchannels(1)
@@ -27,14 +29,14 @@ def save_audio_buffer(buffer, filename, samplerate=16000):
 def record_voice_adaptive(filename="input.wav"):
     """Record until silence is detected or max time is reached."""
     print("Recording (Adaptive)...", flush=True)
-    time.sleep(0.5)
+    time.sleep(0.15)
 
     try:
         samplerate = int(sd.query_devices(kind="input")["default_samplerate"])
     except:
         samplerate = 44100
 
-    silence_threshold = 0.006
+    silence_threshold = 0.03
     silence_duration  = 1.5
     max_record_time   = 30.0
     chunk_duration    = 0.05
@@ -54,7 +56,8 @@ def record_voice_adaptive(filename="input.wav"):
         recorded_chunks += 1
         if recorded_chunks < 5:
             return
-        volume_norm = np.linalg.norm(indata) / np.sqrt(len(indata))
+        processed = preprocess_chunk(indata.flatten(), samplerate)
+        volume_norm = np.linalg.norm(processed) / np.sqrt(len(processed))
         if volume_norm < silence_threshold:
             silent_chunks += 1
             if silent_chunks >= num_silent_chunks:

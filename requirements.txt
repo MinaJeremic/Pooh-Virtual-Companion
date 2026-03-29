@@ -8,3 +8,4 @@ elevenlabs
 duckduckgo-search
 Pillow
 python-dotenv
+noisereduce

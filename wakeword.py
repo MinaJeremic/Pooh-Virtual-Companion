@@ -8,6 +8,7 @@ import sounddevice as sd
 from openwakeword.model import Model
 
 from config import WAKE_WORD_MODEL, WAKE_WORD_THRESHOLD, INPUT_DEVICE_NAME
+from audio_processing import preprocess_chunk
 
 
 class WakeWordDetector:
@@ -71,6 +72,11 @@ class WakeWordDetector:
 
                     if use_resampling:
                         audio_data = scipy.signal.resample(audio_data, CHUNK_SIZE).astype(np.int16)
+
+                    # Preprocess for better wake word detection
+                    float_audio = audio_data.astype(np.float32) / 32767.0
+                    float_audio = preprocess_chunk(float_audio, OWW_SAMPLE_RATE)
+                    audio_data = (float_audio * 32767).astype(np.int16)
 
                     self.model.predict(audio_data)
                     for mdl in self.model.prediction_buffer:
