@@ -1,3 +1,4 @@
+import io
 import os
 import queue
 import random
@@ -27,6 +28,48 @@ def ask_ai(messages, user_text):
     messages.append({"role": "user", "content": user_text})
     messages.append({"role": "assistant", "content": text})
     return text
+
+
+def speak_elevenlabs(text):
+    """
+    Speak text via ElevenLabs TTS in a fire-and-forget background thread.
+    Silently skips if no API key is configured or TTS deps missing.
+    """
+    def _run():
+        try:
+            from config import EL_CLIENT, CURRENT_CONFIG
+            import sounddevice as sd
+            import numpy as np
+
+            voice_id = CURRENT_CONFIG.get("elevenlabs_voice_id", "Rachel")
+            audio_gen = EL_CLIENT.generate(
+                text=text,
+                voice=voice_id,
+                model="eleven_monolingual_v1",
+            )
+            audio_bytes = b"".join(audio_gen)
+            try:
+                from pydub import AudioSegment
+                seg = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+                samples = np.array(seg.get_array_of_samples(), dtype=np.float32)
+                samples /= float(1 << (8 * seg.sample_width - 1))
+                if seg.channels == 2:
+                    samples = samples.reshape(-1, 2)
+                sd.play(samples, samplerate=seg.frame_rate)
+                sd.wait()
+            except ImportError:
+                import tempfile, subprocess, platform
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                    f.write(audio_bytes)
+                    tmp = f.name
+                player = "afplay" if platform.system() == "Darwin" else "mpg123"
+                subprocess.run([player, tmp],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                os.unlink(tmp)
+        except Exception as e:
+            print(f"[TTS] {e}", flush=True)
+
+    threading.Thread(target=_run, daemon=True).start()
 
 
 def _paginate(text, chars_per_line=52, max_lines=3):
@@ -118,9 +161,9 @@ class TextFaceDemo:
         self.bg_label = tk.Label(master, bg="#202040", bd=0)
         self.bg_label.place(x=0, y=0, width=self.BG_WIDTH, height=self.BG_HEIGHT)
 
-        # Subtitle bar at the bottom
+        # Subtitle bar at the bottom — hidden when text is empty
         self.caption_var = tk.StringVar(value="")
-        tk.Label(
+        self.caption_label = tk.Label(
             master,
             textvariable=self.caption_var,
             bg="#000000",
@@ -130,7 +173,8 @@ class TextFaceDemo:
             justify=tk.LEFT,
             padx=14,
             pady=10,
-        ).place(relx=0.5, rely=0.88, anchor=tk.CENTER)
+        )
+        # Start hidden; _apply_caption shows/hides it based on content
 
         # ── Load face images ──────────────────────────────────────────
         self.faces = self._load_faces()
@@ -197,6 +241,10 @@ class TextFaceDemo:
     def _apply_caption(self, text):
         """Apply caption immediately. Must only be called from the main thread."""
         self.caption_var.set(text)
+        if text.strip():
+            self.caption_label.place(relx=0.5, rely=0.88, anchor=tk.CENTER)
+        else:
+            self.caption_label.place_forget()
 
     def _poll_queue(self):
         """
@@ -347,6 +395,9 @@ class TextFaceDemo:
             # ── Speaking ─────────────────────────────────────────────
             print("[FACE -> SPEAKING]", flush=True)
             self.set_state("speaking")
+
+            # Speak via ElevenLabs in background (runs while typewriter plays)
+            speak_elevenlabs(answer)
 
             pages = _paginate(answer)
             print("\n[Pooh] ", end="", flush=True)
