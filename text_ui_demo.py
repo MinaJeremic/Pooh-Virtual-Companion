@@ -8,6 +8,7 @@ import textwrap
 import threading
 import time
 import tkinter as tk
+import webbrowser
 
 from PIL import Image, ImageTk
 
@@ -45,6 +46,37 @@ def speak_elevenlabs(text):
             import subprocess
             import tempfile
 
+                        def _play_in_browser_popup(audio_bytes):
+                                # Optional mode: opens/refreshes a local browser tab with autoplay audio.
+                                base = os.path.join(tempfile.gettempdir(), "pooh_audio_popup")
+                                os.makedirs(base, exist_ok=True)
+                                mp3_path = os.path.join(base, "latest.mp3")
+                                html_path = os.path.join(base, "player.html")
+                                with open(mp3_path, "wb") as f:
+                                        f.write(audio_bytes)
+
+                                html = """<!doctype html>
+<html><head><meta charset='utf-8'><title>Pooh Audio</title></head>
+<body style='font-family:Arial;background:#111;color:#fff;padding:20px'>
+    <h3>Pooh Audio Output</h3>
+    <p>If autoplay is blocked, press play once.</p>
+    <audio id='a' controls autoplay style='width:100%'></audio>
+    <script>
+        const a = document.getElementById('a');
+        a.src = 'latest.mp3?t=' + Date.now();
+        a.play().catch(()=>{});
+        setInterval(() => {
+            const next = 'latest.mp3?t=' + Date.now();
+            if (!a.paused && !a.ended) return;
+            a.src = next;
+            a.play().catch(()=>{});
+        }, 1000);
+    </script>
+</body></html>"""
+                                with open(html_path, "w", encoding="utf-8") as f:
+                                        f.write(html)
+                                webbrowser.open_new_tab("file://" + html_path)
+
             def _play_mp3_external(audio_bytes):
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
                     f.write(audio_bytes)
@@ -71,6 +103,11 @@ def speak_elevenlabs(text):
                 model="eleven_monolingual_v1",
             )
             audio_bytes = b"".join(audio_gen)
+
+            if os.getenv("AUDIO_POPUP", "0") == "1":
+                _play_in_browser_popup(audio_bytes)
+                return
+
             try:
                 from pydub import AudioSegment
                 seg = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
