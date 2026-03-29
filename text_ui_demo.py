@@ -3,6 +3,7 @@ import queue
 import random
 import select
 import sys
+import textwrap
 import threading
 import time
 import tkinter as tk
@@ -26,6 +27,18 @@ def ask_ai(messages, user_text):
     messages.append({"role": "user", "content": user_text})
     messages.append({"role": "assistant", "content": text})
     return text
+
+
+def _paginate(text, chars_per_line=52, max_lines=3):
+    """
+    Split text into screen-sized pages (2D game dialogue style).
+    Each page fits comfortably in the caption bar.
+    """
+    lines = textwrap.wrap(text, width=chars_per_line)
+    pages = []
+    for i in range(0, len(lines), max_lines):
+        pages.append("\n".join(lines[i : i + max_lines]))
+    return pages if pages else [text]
 
 
 def run_terminal_only_demo():
@@ -112,12 +125,12 @@ class TextFaceDemo:
             textvariable=self.caption_var,
             bg="#000000",
             fg="#ffffff",
-            font=("Arial", 20, "bold"),
-            wraplength=780,
-            justify=tk.CENTER,
-            padx=12,
+            font=("Courier", 16, "bold"),
+            wraplength=760,
+            justify=tk.LEFT,
+            padx=14,
             pady=10,
-        ).place(relx=0.5, rely=0.92, anchor=tk.CENTER)
+        ).place(relx=0.5, rely=0.88, anchor=tk.CENTER)
 
         # ── Load face images ──────────────────────────────────────────
         self.faces = self._load_faces()
@@ -334,14 +347,24 @@ class TextFaceDemo:
             # ── Speaking ─────────────────────────────────────────────
             print("[FACE -> SPEAKING]", flush=True)
             self.set_state("speaking")
-            self.set_caption(answer)
 
+            pages = _paginate(answer)
             print("\n[Pooh] ", end="", flush=True)
-            for ch in answer:
-                if not self.running:
-                    return
-                print(ch, end="", flush=True)
-                time.sleep(0.04)
+            for p_idx, page in enumerate(pages):
+                self.set_caption(page)
+                # Type only the visible text chars (skip newlines in terminal)
+                for ch in page:
+                    if not self.running:
+                        return
+                    if ch != "\n":
+                        print(ch, end="", flush=True)
+                    time.sleep(0.04)
+                # Pause between pages so user can read, then clear for next
+                if p_idx < len(pages) - 1:
+                    time.sleep(1.0)
+                    self.set_caption("")
+                    time.sleep(0.15)
+                    print(" / ", end="", flush=True)
             print("\n", flush=True)
 
             # Back to awake listening
