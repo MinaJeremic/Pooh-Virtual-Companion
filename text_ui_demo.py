@@ -46,16 +46,16 @@ def speak_elevenlabs(text):
             import subprocess
             import tempfile
 
-                        def _play_in_browser_popup(audio_bytes):
-                                # Optional mode: opens/refreshes a local browser tab with autoplay audio.
-                                base = os.path.join(tempfile.gettempdir(), "pooh_audio_popup")
-                                os.makedirs(base, exist_ok=True)
-                                mp3_path = os.path.join(base, "latest.mp3")
-                                html_path = os.path.join(base, "player.html")
-                                with open(mp3_path, "wb") as f:
-                                        f.write(audio_bytes)
+            def _play_in_browser_popup(audio_bytes):
+                # Optional mode: opens/refreshes a local browser tab with autoplay audio.
+                base = os.path.join(tempfile.gettempdir(), "pooh_audio_popup")
+                os.makedirs(base, exist_ok=True)
+                mp3_path = os.path.join(base, "latest.mp3")
+                html_path = os.path.join(base, "player.html")
+                with open(mp3_path, "wb") as f:
+                    f.write(audio_bytes)
 
-                                html = """<!doctype html>
+                html = """<!doctype html>
 <html><head><meta charset='utf-8'><title>Pooh Audio</title></head>
 <body style='font-family:Arial;background:#111;color:#fff;padding:20px'>
     <h3>Pooh Audio Output</h3>
@@ -73,9 +73,9 @@ def speak_elevenlabs(text):
         }, 1000);
     </script>
 </body></html>"""
-                                with open(html_path, "w", encoding="utf-8") as f:
-                                        f.write(html)
-                                webbrowser.open_new_tab("file://" + html_path)
+                with open(html_path, "w", encoding="utf-8") as f:
+                    f.write(html)
+                webbrowser.open_new_tab("file://" + html_path)
 
             def _play_mp3_external(audio_bytes):
                 with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
