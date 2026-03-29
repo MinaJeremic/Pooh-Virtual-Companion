@@ -73,6 +73,8 @@ def run_terminal_only_demo():
 class TextFaceDemo:
     BG_WIDTH, BG_HEIGHT = 800, 480
     SESSION_TIMEOUT_SECONDS = 5 * 60
+    BLINK_INTERVAL_SECONDS = 45.0
+    BLINK_DURATION_SECONDS = 0.22
 
     # Face animation speeds (ms per frame)
     SPEED_SPEAKING = 80
@@ -86,6 +88,8 @@ class TextFaceDemo:
         self.messages  = []
         self.awake = False
         self.last_input_at = 0.0
+        self._next_blink_at = time.monotonic() + self.BLINK_INTERVAL_SECONDS
+        self._blink_until = 0.0
 
         # Thread -> main-thread command queue.
         # This is the ONLY correct way to drive Tkinter from a bg thread.
@@ -202,11 +206,30 @@ class TextFaceDemo:
         """Cycle through face frames in the main thread."""
         if not self.running:
             return
-        frames = self.faces.get(self.state, self.faces["idle"])
-        if self.state == "speaking" and len(frames) > 1:
+
+        # Keep eyes open while waiting by borrowing listening frames for idle.
+        if self.state == "idle" and len(self.faces.get("listening", [])) > 0:
+            frames = self.faces["listening"]
+        else:
+            frames = self.faces.get(self.state, self.faces["idle"])
+
+        # Waiting states: mostly eyes-open, blink every 45 seconds.
+        if self.state in {"idle", "listening"} and len(frames) > 1:
+            now = time.monotonic()
+            if now >= self._next_blink_at:
+                self._blink_until = now + self.BLINK_DURATION_SECONDS
+                self._next_blink_at = now + self.BLINK_INTERVAL_SECONDS
+
+            if now < self._blink_until:
+                self.frame_idx = 1  # blink frame
+            else:
+                self.frame_idx = 0  # eyes open frame
+
+        elif self.state == "speaking" and len(frames) > 1:
             self.frame_idx = random.randint(0, len(frames) - 1)
         else:
             self.frame_idx = (self.frame_idx + 1) % len(frames)
+
         self.bg_label.config(image=frames[self.frame_idx])
         speed = self.SPEED_SPEAKING if self.state == "speaking" else self.SPEED_OTHER
         self.master.after(speed, self._animate)
@@ -230,7 +253,7 @@ class TextFaceDemo:
                 self.set_state("listening")
                 self.set_caption("I'm awake. Talk to me.")
             elif tick % 6 == 3:
-                self.set_state("idle")
+                self.set_state("listening")
                 self.set_caption("Wake me up" if not awake_mode else "I'm awake. Talk to me.")
 
             try:
@@ -262,7 +285,7 @@ class TextFaceDemo:
             # sleep if awake window expired
             if self.awake and now >= awake_deadline:
                 self.awake = False
-                self.set_state("idle")
+                self.set_state("listening")
                 self.set_caption("Wake me up")
                 print("\n[FACE -> IDLE] session timeout (5 min)", flush=True)
 
@@ -271,7 +294,7 @@ class TextFaceDemo:
                 self.set_state("listening")
                 self.set_caption("I'm awake. Talk to me.")
             else:
-                self.set_state("idle")
+                self.set_state("listening")
                 self.set_caption("Wake me up")
 
             print("\nYou: ", end="", flush=True)
