@@ -37,4 +37,21 @@ if [ ! -f "wakeword.onnx" ]; then
     curl -L -o wakeword.onnx https://github.com/dscripka/openWakeWord/raw/main/openwakeword/resources/models/hey_jarvis_v0.1.onnx
 fi
 
-echo -e "${GREEN}✨ Setup Complete! Run 'source venv/bin/activate' then 'python agent.py'${NC}"
+# Install whisper.cpp for transcription and 'Hey Pooh' wake fallback
+if [ ! -d "whisper.cpp" ]; then
+    echo -e "${YELLOW}Cloning whisper.cpp...${NC}"
+    git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git
+fi
+
+echo -e "${YELLOW}Building whisper.cpp...${NC}"
+cmake -S whisper.cpp -B whisper.cpp/build
+cmake --build whisper.cpp/build -j$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+
+mkdir -p whisper.cpp/models
+if [ ! -f "whisper.cpp/models/ggml-base.en.bin" ]; then
+    echo -e "${YELLOW}Downloading Whisper base English model...${NC}"
+    curl -L -o whisper.cpp/models/ggml-base.en.bin \
+        https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+fi
+
+echo -e "${GREEN}✨ Setup Complete! Run 'source venv/bin/activate' then 'python main.py'${NC}"

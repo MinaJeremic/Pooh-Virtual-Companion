@@ -2,7 +2,6 @@ import sys
 import time
 import atexit
 import threading
-import subprocess
 
 import tkinter as tk
 from tkinter import ttk
@@ -14,6 +13,7 @@ from audio import record_voice_adaptive, record_voice_ptt
 from wakeword import WakeWordDetector
 from voice import TTSEngine
 from brain import Brain
+from whisper_utils import transcribe_file
 
 
 class BotGUI:
@@ -313,18 +313,7 @@ class BotGUI:
     def _transcribe(self, filename):
         print("Transcribing...", flush=True)
         try:
-            result = subprocess.run(
-                ["./whisper.cpp/build/bin/whisper-cli",
-                 "-m", "./whisper.cpp/models/ggml-base.en.bin",
-                 "-l", "en", "-t", "4", "-f", filename],
-                capture_output=True, text=True,
-            )
-            lines = result.stdout.strip().split("\n")
-            if lines and lines[-1].strip():
-                last = lines[-1].strip()
-                transcription = last.split("]")[1].strip() if "]" in last else last
-            else:
-                transcription = ""
+            transcription = transcribe_file(filename)
             print(f"Heard: '{transcription}'", flush=True)
             return transcription.strip()
         except Exception as e:
