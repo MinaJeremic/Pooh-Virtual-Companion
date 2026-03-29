@@ -2,7 +2,7 @@ import os
 import json
 import warnings
 from dotenv import load_dotenv
-import anthropic
+from openai import OpenAI
 from elevenlabs.client import ElevenLabs
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
@@ -18,8 +18,8 @@ WAKE_WORD_THRESHOLD = 0.5
 INPUT_DEVICE_NAME = None
 
 DEFAULT_CONFIG = {
-    "claude_model": "claude-sonnet-4-6",
-    "anthropic_api_key": "",
+    "openai_model": "gpt-4o-mini",
+    "openai_api_key": "",
     "vision_model": "moondream",
     "elevenlabs_api_key": "",
     "elevenlabs_voice_id": "Rachel",
@@ -42,9 +42,10 @@ def load_config():
     return config
 
 CURRENT_CONFIG = load_config()
-CLAUDE_MODEL = CURRENT_CONFIG.get("claude_model", "claude-sonnet-4-6")
-AI_CLIENT = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY", CURRENT_CONFIG.get("anthropic_api_key", ""))
+AI_MODEL = CURRENT_CONFIG.get("openai_model", "gpt-4o-mini")
+CLAUDE_MODEL = AI_MODEL  # Backward-compatible name used across existing modules.
+AI_CLIENT = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY", CURRENT_CONFIG.get("openai_api_key", ""))
 )
 EL_CLIENT = ElevenLabs(
     api_key=os.getenv("ELEVENLABS_API_KEY", CURRENT_CONFIG.get("elevenlabs_api_key", ""))

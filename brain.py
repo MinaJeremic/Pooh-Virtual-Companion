@@ -11,7 +11,7 @@ from actions import execute_action, capture_image
 
 class Brain:
     """
-    Handles all Claude interactions, action routing, and proactive check-ins.
+    Handles all LLM interactions, action routing, and proactive check-ins.
 
     Callbacks expected:
         set_state(state, msg, cam_path=None)
@@ -78,39 +78,47 @@ class Brain:
         is_action     = False
 
         try:
-            with AI_CLIENT.messages.stream(
+            stream = AI_CLIENT.chat.completions.create(
                 model=CLAUDE_MODEL,
-                system=SYSTEM_PROMPT,
-                messages=api_messages,
+                messages=[{"role": "system", "content": SYSTEM_PROMPT}] + api_messages,
                 max_tokens=512,
-            ) as stream:
-                for chunk in stream.text_stream:
-                    if self.interrupted.is_set():
-                        break
+                stream=True,
+            )
 
-                    full_response += chunk
+            for part in stream:
+                if self.interrupted.is_set():
+                    break
 
-                    if '{"' in chunk or "action:" in chunk.lower():
-                        is_action = True
-                        self.tts.stop_thinking_sounds()
-                        continue
+                if not part.choices:
+                    continue
 
-                    if is_action:
-                        continue
+                chunk = part.choices[0].delta.content or ""
+                if not chunk:
+                    continue
 
+                full_response += chunk
+
+                if '{"' in chunk or "action:" in chunk.lower():
+                    is_action = True
                     self.tts.stop_thinking_sounds()
-                    if self._get_state() != BotStates.SPEAKING:
-                        self._set_state(BotStates.SPEAKING, "Speaking...", img_path)
-                        self._append_text("BOT: ", newline=False)
+                    continue
 
-                    self._stream_text(chunk)
-                    sentence_buf += chunk
+                if is_action:
+                    continue
 
-                    if any(p in chunk for p in ".!?\n"):
-                        clean = sentence_buf.strip()
-                        if clean and re.search(r"[a-zA-Z0-9]", clean):
-                            self.tts.enqueue(clean)
-                        sentence_buf = ""
+                self.tts.stop_thinking_sounds()
+                if self._get_state() != BotStates.SPEAKING:
+                    self._set_state(BotStates.SPEAKING, "Speaking...", img_path)
+                    self._append_text("BOT: ", newline=False)
+
+                self._stream_text(chunk)
+                sentence_buf += chunk
+
+                if any(p in chunk for p in ".!?\n"):
+                    clean = sentence_buf.strip()
+                    if clean and re.search(r"[a-zA-Z0-9]", clean):
+                        self.tts.enqueue(clean)
+                    sentence_buf = ""
 
             # Handle remaining sentence fragment
             if not is_action and sentence_buf.strip():
@@ -134,8 +142,8 @@ class Brain:
             with open(img_path, "rb") as f:
                 img_data = base64.standard_b64encode(f.read()).decode("utf-8")
             return [{"role": "user", "content": [
-                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": img_data}},
                 {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_data}"}},
             ]}]
         return [m for m in messages if m.get("role") != "system"]
 
@@ -170,13 +178,15 @@ class Brain:
         elif result:
             self._set_state(BotStates.THINKING, "Reading...")
             self.tts.start_thinking_sounds()
-            summary = AI_CLIENT.messages.create(
+            summary = AI_CLIENT.chat.completions.create(
                 model=CLAUDE_MODEL,
-                system="Summarize this result in one short, friendly sentence.",
-                messages=[{"role": "user", "content": f"RESULT: {result}\nUser Question: {original_text}"}],
+                messages=[
+                    {"role": "system", "content": "Summarize this result in one short, friendly sentence."},
+                    {"role": "user", "content": f"RESULT: {result}\nUser Question: {original_text}"},
+                ],
                 max_tokens=100,
             )
-            final_text = summary.content[0].text
+            final_text = (summary.choices[0].message.content or "").strip()
             self.tts.stop_thinking_sounds()
             self._set_state(BotStates.SPEAKING, "Speaking...", img_path)
             self._append_text("BOT: ", newline=False)
@@ -204,13 +214,15 @@ class Brain:
                     "Gently remind the user you are here if they need to talk. One short sentence.",
                 ])
                 try:
-                    resp = AI_CLIENT.messages.create(
+                    resp = AI_CLIENT.chat.completions.create(
                         model=CLAUDE_MODEL,
-                        system=SYSTEM_PROMPT,
-                        messages=[{"role": "user", "content": prompt}],
+                        messages=[
+                            {"role": "system", "content": SYSTEM_PROMPT},
+                            {"role": "user", "content": prompt},
+                        ],
                         max_tokens=60,
                     )
-                    checkin_text = resp.content[0].text.strip()
+                    checkin_text = (resp.choices[0].message.content or "").strip()
                     self._set_state(BotStates.SPEAKING, "Checking in...")
                     self.tts.enqueue(checkin_text)
                     self._append_text(f"BOT: {checkin_text}")

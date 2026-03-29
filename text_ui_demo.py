@@ -4,18 +4,17 @@ import random
 import tkinter as tk
 from PIL import Image, ImageTk
 
-from config import AI_CLIENT, CLAUDE_MODEL, SYSTEM_PROMPT
+from config import AI_CLIENT, AI_MODEL, SYSTEM_PROMPT
 
 
-def ask_claude(messages, user_text):
+def ask_ai(messages, user_text):
     msgs = messages + [{"role": "user", "content": user_text}]
-    response = AI_CLIENT.messages.create(
-        model=CLAUDE_MODEL,
-        system=SYSTEM_PROMPT,
-        messages=msgs,
+    response = AI_CLIENT.chat.completions.create(
+        model=AI_MODEL,
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + msgs,
         max_tokens=300,
     )
-    text = response.content[0].text.strip()
+    text = (response.choices[0].message.content or "").strip()
     messages.append({"role": "user", "content": user_text})
     messages.append({"role": "assistant", "content": text})
     return text
@@ -45,9 +44,9 @@ def run_terminal_only_demo():
         print("[STATE] THINKING", flush=True)
 
         try:
-            answer = ask_claude(messages, user_text)
+            answer = ask_ai(messages, user_text)
         except Exception as e:
-            print(f"[ERROR] Claude error: {e}", flush=True)
+            print(f"[ERROR] AI error: {e}", flush=True)
             continue
 
         print("[STATE] SPEAKING", flush=True)
@@ -148,8 +147,8 @@ class TextFaceDemo:
         speed = 60 if self.state == "speaking" else 450
         self.master.after(speed, self._animate)
 
-    def _ask_claude(self, user_text):
-        return ask_claude(self.messages, user_text)
+    def _ask_ai(self, user_text):
+        return ask_ai(self.messages, user_text)
 
     def _type_print(self, text, delay=0.018):
         self.set_state("speaking")
@@ -186,10 +185,10 @@ class TextFaceDemo:
             self.set_caption("Think, think, think...")
 
             try:
-                answer = self._ask_claude(user_text)
+                answer = self._ask_ai(user_text)
             except Exception as e:
                 self.set_state("error")
-                err = f"Claude error: {e}"
+                err = f"AI error: {e}"
                 self.set_caption(err)
                 print(f"\n[ERROR] {err}", flush=True)
                 time.sleep(1.2)

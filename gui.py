@@ -305,8 +305,8 @@ class BotGUI:
 
     def _warm_up(self):
         self.set_state(BotStates.WARMUP, "Warming up brains...")
-        from config import CLAUDE_MODEL
-        print(f"Using Claude model: {CLAUDE_MODEL}", flush=True)
+        from config import AI_MODEL
+        print(f"Using model: {AI_MODEL}", flush=True)
         self.tts.enqueue("Hello there, friend.")
         print("Ready.", flush=True)
 
