@@ -9,7 +9,7 @@ WHISPER_CLI_CANDIDATES = [
 ]
 WAKE_PHRASES = ["hey pooh", "hey poo", "hey puh", "hey po", "hey boo", "hey poooh"]
 WAKE_LISTEN_CHUNK = 2.0
-WAKE_MIN_PEAK = 0.01
+WAKE_MIN_PEAK = 0.005  # Lowered for quiet Pi mics — AGC normalises level before Whisper
 
 
 def get_whisper_cli_path():

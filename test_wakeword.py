@@ -90,7 +90,12 @@ def record_chunk(duration, samplerate):
     audio = sd.rec(int(samplerate * duration), samplerate=samplerate,
                    channels=1, dtype="float32")
     sd.wait()
-    # No gain boost — use raw mic input
+    # Apply AGC so quiet mics still produce usable audio for Whisper
+    try:
+        from audio_processing import preprocess_chunk
+        audio = preprocess_chunk(audio.flatten(), samplerate).reshape(-1, 1)
+    except Exception:
+        pass
     return audio
 
 
