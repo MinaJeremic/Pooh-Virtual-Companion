@@ -7,7 +7,7 @@ from elevenlabs.client import ElevenLabs
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
 
-load_dotenv()
+load_dotenv(override=True)
 
 # File paths
 CONFIG_FILE = "config.json"
@@ -44,11 +44,34 @@ def load_config():
 CURRENT_CONFIG = load_config()
 AI_MODEL = CURRENT_CONFIG.get("openai_model", "gpt-4o-mini")
 CLAUDE_MODEL = AI_MODEL  # Backward-compatible name used across existing modules.
+
+
+def _resolve_api_key(env_name: str, config_value: str) -> str:
+    env_val = (os.getenv(env_name, "") or "").strip()
+    cfg_val = (config_value or "").strip()
+
+    def _is_placeholder(v: str) -> bool:
+        v_lower = v.lower()
+        return (
+            not v
+            or "your-key" in v_lower
+            or "replace-me" in v_lower
+            or "paste-key" in v_lower
+            or v_lower in {"changeme", "placeholder"}
+        )
+
+    if not _is_placeholder(env_val):
+        return env_val
+    if not _is_placeholder(cfg_val):
+        return cfg_val
+    return ""
+
+
 AI_CLIENT = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY", CURRENT_CONFIG.get("openai_api_key", ""))
+    api_key=_resolve_api_key("OPENAI_API_KEY", CURRENT_CONFIG.get("openai_api_key", ""))
 )
 EL_CLIENT = ElevenLabs(
-    api_key=os.getenv("ELEVENLABS_API_KEY", CURRENT_CONFIG.get("elevenlabs_api_key", ""))
+    api_key=_resolve_api_key("ELEVENLABS_API_KEY", CURRENT_CONFIG.get("elevenlabs_api_key", ""))
 )
 
 
