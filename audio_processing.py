@@ -12,7 +12,7 @@ def highpass_filter(audio, samplerate, cutoff=80, order=4):
     return sosfilt(sos, audio).astype(audio.dtype)
 
 
-def apply_agc(audio, target_rms=0.1, max_gain=10.0):
+def apply_agc(audio, target_rms=0.2, max_gain=40.0):
     """Automatic gain control — normalize volume to a consistent level."""
     rms = np.sqrt(np.mean(audio ** 2))
     if rms < 1e-6:
