@@ -40,6 +40,29 @@ def speak_elevenlabs(text):
             from config import EL_CLIENT, CURRENT_CONFIG
             import sounddevice as sd
             import numpy as np
+            import platform
+            import shutil
+            import subprocess
+            import tempfile
+
+            def _play_mp3_external(audio_bytes):
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                    f.write(audio_bytes)
+                    tmp = f.name
+                try:
+                    if platform.system() == "Darwin" and shutil.which("afplay"):
+                        subprocess.run(["afplay", tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        return
+                    for player_cmd in (["mpg123", "-q"], ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet"], ["mpv", "--really-quiet"]):
+                        if shutil.which(player_cmd[0]):
+                            subprocess.run(player_cmd + [tmp], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            return
+                    print("[TTS] No audio player found (need afplay/mpg123/ffplay/mpv).", flush=True)
+                finally:
+                    try:
+                        os.unlink(tmp)
+                    except Exception:
+                        pass
 
             voice_id = CURRENT_CONFIG.get("elevenlabs_voice_id", "Rachel")
             audio_gen = EL_CLIENT.generate(
@@ -57,15 +80,8 @@ def speak_elevenlabs(text):
                     samples = samples.reshape(-1, 2)
                 sd.play(samples, samplerate=seg.frame_rate)
                 sd.wait()
-            except ImportError:
-                import tempfile, subprocess, platform
-                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
-                    f.write(audio_bytes)
-                    tmp = f.name
-                player = "afplay" if platform.system() == "Darwin" else "mpg123"
-                subprocess.run([player, tmp],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                os.unlink(tmp)
+            except Exception:
+                _play_mp3_external(audio_bytes)
         except Exception as e:
             print(f"[TTS] {e}", flush=True)
 
