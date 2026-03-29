@@ -90,6 +90,9 @@ def record_chunk(duration, samplerate):
     audio = sd.rec(int(samplerate * duration), samplerate=samplerate,
                    channels=1, dtype="float32")
     sd.wait()
+    # Boost mic gain 3x for better sensitivity
+    audio = audio * 3.0
+    audio = np.clip(audio, -1.0, 1.0)
     return audio
 
 
@@ -194,7 +197,7 @@ class WakeWordTestApp:
 
             # Skip if too quiet (no one talking)
             print(f"[VOL] peak={peak:.4f}", flush=True)
-            if peak < 0.005:
+            if peak < 0.001:
                 continue
 
             # Save and transcribe the chunk
