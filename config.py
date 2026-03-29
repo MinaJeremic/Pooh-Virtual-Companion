@@ -7,13 +7,14 @@ from elevenlabs.client import ElevenLabs
 
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
 
-load_dotenv(override=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 # File paths
-CONFIG_FILE = "config.json"
-MEMORY_FILE = "memory.json"
-IMAGE_FILE = "current_image.jpg"
-WAKE_WORD_MODEL = "./wakeword.onnx"
+CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
+MEMORY_FILE = os.path.join(BASE_DIR, "memory.json")
+IMAGE_FILE = os.path.join(BASE_DIR, "current_image.jpg")
+WAKE_WORD_MODEL = os.path.join(BASE_DIR, "wakeword.onnx")
 WAKE_WORD_THRESHOLD = 0.5
 INPUT_DEVICE_NAME = None
 
